@@ -1,0 +1,251 @@
+# -*- coding: utf-8 -*-
+# This file is part of beets.
+# Copyright 2016, Adrian Sampson.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+
+"""Shows file metadata.
+"""
+
+from __future__ import division, absolute_import, print_function
+
+import os
+import re
+
+from beets.plugins import BeetsPlugin
+from beets import ui
+import mediafile
+from beets.library import Album, Item
+from beets.util import displayable_path, normpath, syspath
+
+
+def tag_data(lib, args):
+    query = []
+    for arg in args:
+        path = normpath(arg)
+        if os.path.isfile(syspath(path)):
+            yield tag_data_emitter(path)
+        else:
+            query.append(arg)
+
+    if query:
+        for item in lib.items(query):
+            yield tag_data_emitter(item.path)
+
+
+def tag_data_emitter(path):
+    def emitter(included_keys):
+        mf = mediafile.MediaFile(syspath(path))
+        tags = {}
+        for field in included_keys:
+            value = getattr(mf, field)
+            if field == 'art':
+                tags['art'] = bool(value)
+            elif value:
+                tags[field] = value
+        # create a temporary Item to take advantage of __format__
+        item = Item.from_path(syspath(path))
+
+        return tags, item
+    return emitter
+
+
+def library_data(lib, args):
+    for item in lib.items(args):
+        yield library_data_emitter(item)
+
+
+def library_data_emitter(item):
+    def emitter(included_keys):
+        data = {}
+        for field in included_keys:
+            if field in item:
+                data[field] = item[field]
+
+        return data, item
+    return emitter
+
+
+def all_tag_fields():
+    fields = list(mediafile.MediaFile.readable_fields())
+    fields.remove('images')
+    return fields
+
+def all_library_fields():
+    return Item.all_keys() + Album.all_keys()
+
+
+def expand_key_list(keys, all_fields):
+    """Process '*' glob patterns in a list of library key names."""
+
+    # By default, if no field inclusions are specified, include everything.
+    if not keys:
+        return all_fields
+
+    matchers = []
+    for key in keys:
+        pattern = re.escape(key).replace(r'\*', '.*') + '$'
+        matchers.append(re.compile(pattern))
+        keys.remove(key)
+
+    def filter_(fields):
+        for field in fields:
+            if field in keys:
+                yield field
+            if any([m.match(field) for m in matchers]):
+                yield field
+
+    return list(filter_(all_fields))
+
+
+def update_summary(summary, tags):
+    for key, value in tags.items():
+        if key not in summary:
+            summary[key] = value
+        elif summary[key] != value:
+            summary[key] = '[various]'
+    return summary
+
+
+def print_data(data, item=None, fmt=None):
+    """Print, with optional formatting, the fields of a single element.
+
+    If no format string `fmt` is passed, the entries on `data` are printed one
+    in each line, with the format 'field: value'. If `fmt` is not `None`, the
+    `item` is printed according to `fmt`, using the `Item.__format__`
+    machinery.
+    """
+    if fmt:
+        # use fmt specified by the user
+        ui.print_(format(item, fmt))
+        return
+
+    path = displayable_path(item.path) if item else None
+    formatted = {}
+    for key, value in data.items():
+        if isinstance(value, list):
+            formatted[key] = u'; '.join(value)
+        if value is not None:
+            formatted[key] = value
+
+    if len(formatted) == 0:
+        return
+
+    maxwidth = max(len(key) for key in formatted)
+    lineformat = u'{{0:>{0}}}: {{1}}'.format(maxwidth)
+
+    if path:
+        ui.print_(displayable_path(path))
+
+    for field in sorted(formatted):
+        value = formatted[field]
+        if isinstance(value, list):
+            value = u'; '.join(value)
+        ui.print_(lineformat.format(field, value))
+
+
+def print_data_keys(data, item=None):
+    """Print only the keys (field names) for an item.
+    """
+    path = displayable_path(item.path) if item else None
+    formatted = []
+    for key, value in data.items():
+        formatted.append(key)
+
+    if len(formatted) == 0:
+        return
+
+    line_format = u'{0}{{0}}'.format(u' ' * 4)
+    if path:
+        ui.print_(displayable_path(path))
+
+    for field in sorted(formatted):
+        ui.print_(line_format.format(field))
+
+
+class InfoPlugin(BeetsPlugin):
+
+    def commands(self):
+        cmd = ui.Subcommand('info', help=u'show file metadata')
+        cmd.func = self.run
+        cmd.parser.add_option(
+            u'-l', u'--library', action='store_true',
+            help=u'show library fields instead of tags',
+        )
+        cmd.parser.add_option(
+            u'-s', u'--summarize', action='store_true',
+            help=u'summarize the tags of all files',
+        )
+        cmd.parser.add_option(
+            u'-i', u'--include-keys', default=[],
+            action='append', dest='included_keys',
+            help=u'comma separated list of keys to show',
+        )
+        cmd.parser.add_option(
+            u'-k', u'--keys-only', action='store_true',
+            help=u'show only the keys',
+        )
+        cmd.parser.add_format_option(target='item')
+        return [cmd]
+
+    def run(self, lib, opts, args):
+        """Print tag info or library data for each file referenced by args.
+
+        Main entry point for the `beet info ARGS...` command.
+
+        If an argument is a path pointing to an existing file, then the tags
+        of that file are printed. All other arguments are considered
+        queries, and for each item matching all those queries the tags from
+        the file are printed.
+
+        If `opts.summarize` is true, the function merges all tags into one
+        dictionary and only prints that. If two files have different values
+        for the same tag, the value is set to '[various]'
+        """
+        if opts.library:
+            data_collector = library_data
+        else:
+            data_collector = tag_data
+
+        all_fields = all_library_fields() if opts.library else all_tag_fields()
+        included_keys = []
+        for keys in opts.included_keys:
+            included_keys.extend(keys.split(','))
+        included_keys = expand_key_list(included_keys, all_fields)
+        # Drop path even if user provides it multiple times
+        included_keys = [k for k in included_keys if k != 'path']
+
+        first = True
+        summary = {}
+        for data_emitter in data_collector(lib, ui.decargs(args)):
+            try:
+                data, item = data_emitter(included_keys)
+            except (mediafile.UnreadableFileError, IOError) as ex:
+                self._log.error(u'cannot read file: {0}', ex)
+                continue
+
+            if opts.summarize:
+                update_summary(summary, data)
+            else:
+                if not first:
+                    ui.print_()
+                if opts.keys_only:
+                    print_data_keys(data, item)
+                else:
+                    fmt = ui.decargs([opts.format])[0] if opts.format else None
+                    print_data(data, item, fmt)
+                first = False
+
+        if opts.summarize:
+            print_data(summary)
+
+
