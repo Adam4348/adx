@@ -1,0 +1,141 @@
+#header {
+    margin-top: 10px;
+}
+#header.leader {
+    margin-top: 20px;
+    height: 7em;
+}
+.fixed-header {
+    display: none;
+}
+
+/* up to "small devices" */
+@media (max-width: 992px) {
+    #header.leader {
+        height: auto;
+        margin-bottom: 10px;
+    }
+    .rotating-header {
+        display: none;
+    }
+    .fixed-header {
+        display: block;
+    }
+}
+
+.flair {
+    margin-top: 1em;
+    text-align: center;
+}
+
+#sidebar h3 a {
+    color: inherit;
+}
+#sidebar h3 a:hover {
+    text-decoration: none;
+}
+#sidebar ul.project {
+    padding-left: 1.5em;
+}
+
+li {
+    color: inherit;
+}
+ul, ol {
+    margin-bottom: 1em;
+}
+
+.screen p:first-of-type {
+    margin-top: 1em;
+}
+
+.newslist {
+    margin-bottom: 0;
+}
+.newslist, .newslist li {
+    margin-left: 0;
+    padding-left: 0;
+    list-style: none;
+}
+.newslist li {
+    margin-bottom: 0.1em;
+}
+.newslist .date {
+    color: #999;
+}
+
+.feed-icon {
+    position: absolute;
+    margin-top: -3px;
+    margin-left: 7px;
+}
+
+/* Responsive video embed.
+ * http://amobil.se/2011/11/responsive-embeds/
+ */
+.embed {
+    position: relative;
+    padding-bottom: 56.25%; /* 16/9 ratio */
+    padding-top: 30px; /* IE6 workaround*/
+    height: 0;
+    overflow: hidden;
+}
+.embed iframe,
+.embed object,
+.embed embed {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Undo Bootstrap's form styling for donate buttons. */
+#donate input[type=image] {
+    width: auto;
+    height: auto;
+    -webkit-appearance: none;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    -webkit-box-shadow: none;
+    -moz-box-shadow: none;
+}
+#donate input[type=text] {
+    width: 5em;
+}
+
+.articleFooter {
+    color: #999;
+    font-style: italic;
+    border-top: 1px solid #ccc;
+    margin-top: 1.25em;
+}
+.articleFooter a {
+    color: #666;
+    text-decoration: underline;
+}
+
+#blog img {
+    display: block;
+    margin: 0.5em auto;
+}
+
+/* GitHub "fork me" banner */
+/* https://github.com/philwareham/github-ribbons-retina */
+#fork-me {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 9999;
+    width: 140px;
+    height: 140px;
+    text-indent: -9999px;
+    background-image: url("/images/fork-me.png");
+}
+@media (-webkit-min-device-pixel-ratio: 2) {
+    #fork-me {
+        background-image: url("/images/fork-me@2x.png") !important;
+        -webkit-background-size: 140px 140px;
+    }
+}
