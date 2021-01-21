@@ -1,0 +1,72 @@
+dist: trusty
+sudo: required
+language: python
+
+env:
+    global:
+        # Undocumented feature of nose-show-skipped.
+        NOSE_SHOW_SKIPPED: 1
+
+matrix:
+    include:
+        - python: 2.7
+          env: {TOX_ENV: py27-cov, COVERAGE: 1}
+        - python: 3.4
+          env: {TOX_ENV: py34-test}
+        - python: 3.5
+          env: {TOX_ENV: py35-test}
+        - python: 3.6-dev
+          env: {TOX_ENV: py36-test}
+        # - python: pypy
+        #   - env: {TOX_ENV: pypy-test}
+        - python: 3.4
+          env: {TOX_ENV: py34-flake8}
+        - python: 2.7
+          env: {TOX_ENV: docs}
+    allow_failures:
+        - python: 3.6-dev
+# Non-Python dependencies.
+addons:
+    apt:
+        sources:
+            - sourceline: "deb http://archive.ubuntu.com/ubuntu/ trusty multiverse"
+            - sourceline: "deb http://archive.ubuntu.com/ubuntu/ trusty-updates multiverse"
+        packages:
+            - bash-completion
+            - gir1.2-gst-plugins-base-1.0
+            - gir1.2-gstreamer-1.0
+            - gstreamer1.0-plugins-good
+            - gstreamer1.0-plugins-bad
+            - imagemagick
+            - mp3gain
+            - python-gi
+            - python-gst-1.0
+            - python3-gi
+            - python3-gst-1.0
+            - unrar
+
+# To install dependencies, tell tox to do everything but actually running the
+# test.
+install:
+    - travis_retry pip install tox sphinx
+    - travis_retry tox -e $TOX_ENV --notest
+
+script: tox -e $TOX_ENV
+
+# Report coverage to codecov.io.
+before_install:
+    - "[ ! -z $COVERAGE ] && travis_retry pip install codecov || true"
+after_success:
+    - "[ ! -z $COVERAGE ] && codecov || true"
+
+cache:
+    pip: true
+
+notifications:
+    irc:
+        channels:
+            - "irc.freenode.org#beets"
+        use_notice: true
+        skip_join: true
+        on_success: change
+        on_failure: always
