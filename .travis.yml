@@ -1,0 +1,38 @@
+language: python
+
+branches:
+    only:
+        - master
+
+matrix:
+    include:
+        - python: 2.6
+          env: {TOX_ENV: py26}
+        - python: 2.7
+          env: {TOX_ENV: py27, COVERAGE: 1}
+        - python: pypy
+          env: {TOX_ENV: pypy}
+        - python: 2.7
+          env: {TOX_ENV: docs}
+        - python: 2.7
+          env: {TOX_ENV: flake8}
+
+install:
+    - travis_retry sudo apt-get update
+    - travis_retry sudo apt-get install -qq bash-completion mp3gain
+    - travis_retry pip install tox sphinx
+    - "[ ! -z $COVERAGE ] && pip install coveralls || true"
+
+script: tox -e $TOX_ENV
+
+# coveralls.io reporting, using https://github.com/coagulant/coveralls-python
+# Only report coverage for one version.
+after_success:
+    - "[ ! -z $COVERAGE ] && coveralls || true"
+
+notifications:
+    irc:
+        channels:
+            - "irc.freenode.org#beets"
+        use_notice: true
+        skip_join: true
